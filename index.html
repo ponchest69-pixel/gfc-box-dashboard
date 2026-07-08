@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GFC BOX — Panel de Diagnóstico IST</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="top">
+  <div class="top-row">
+    <div class="brand">
+      <div class="mark"></div>
+      <div>
+        <h1>GFC BOX <small>IST FAILURE LOG</small></h1>
+        <p>Diagnóstico de fallas de prueba en sistema — Líneas TLA / REPAIR / UNBIND · Semanas <span id="wk-range">24–28</span>, 2026</p>
+      </div>
+    </div>
+    <div class="live-badge"><span class="live-dot"></span> <span id="row-count">cargando…</span> registros cargados</div>
+  </div>
+
+  <div class="kpis" id="kpi-strip"></div>
+</header>
+
+<div class="filters">
+  <div class="filter-panel">
+    <div class="f-group">
+      <label>Semana</label>
+      <div class="chips" id="chip-week"></div>
+    </div>
+    <div class="f-group">
+      <label>Turno</label>
+      <div class="chips" id="chip-turno"></div>
+    </div>
+    <div class="f-group">
+      <label>Línea</label>
+      <select id="sel-line"><option value="">Todas</option></select>
+    </div>
+    <div class="f-group">
+      <label>PO / Lote</label>
+      <select id="sel-po"><option value="">Todos</option></select>
+    </div>
+    <div class="f-group">
+      <label>Revisión</label>
+      <select id="sel-rev"><option value="">Todas</option></select>
+    </div>
+    <div class="f-group">
+      <label>Defect Code</label>
+      <select id="sel-defect"><option value="">Todos</option></select>
+    </div>
+    <div class="f-group">
+      <label>Buscar Serial</label>
+      <input type="text" id="search-serial" placeholder="FLGxxxx-xxxxx">
+    </div>
+    <button class="btn-reset" id="btn-reset">✕ Limpiar filtros</button>
+  </div>
+</div>
+<div class="active-filters" id="active-filters-line"></div>
+
+<main>
+
+  <div class="note-banner">
+    <span>⚠</span>
+    <div><b>Nota de datos:</b> este dataset contiene únicamente registros con <b>Status = Fail</b> (no incluye pasadas exitosas), por lo que todas las métricas reflejan volumen y distribución de fallas, no yield. La ubicación <b>"NDF"</b> (No Defect Found) se muestra por separado ya que no implica un defecto de componente confirmado.</div>
+  </div>
+
+  <!-- Signature: Rack Wall -->
+  <div class="panel">
+    <div class="panel-head">
+      <div>
+        <h2>◧ Mapa del muro de racks (Rack × Slot)</h2>
+        <div class="desc">Intensidad de fallas por rack de prueba y posición de fixture (1–16). Click en una celda o etiqueta para filtrar por ese rack.</div>
+      </div>
+      <div class="count-badge" id="rackwall-badge">racks activos</div>
+    </div>
+    <div class="rackwall-wrap"><div class="rackwall" id="rackwall"></div></div>
+    <div class="legend-scale">Baja <div class="legend-grad"></div> Alta &nbsp;·&nbsp; tamaño de la muestra por celda</div>
+  </div>
+
+  <div class="grid cols-3">
+    <div class="panel">
+      <div class="panel-head">
+        <div><h2>◈ Tendencia semanal de fallas</h2><div class="desc">Volumen de fallas por semana, segmentado por línea de producción</div></div>
+      </div>
+      <div id="chart-trend"></div>
+    </div>
+    <div class="panel">
+      <div class="panel-head">
+        <div><h2>◉ Composición por turno</h2><div class="desc">Distribución de fallas T1/T2/T3</div></div>
+      </div>
+      <div id="chart-turno"></div>
+    </div>
+  </div>
+
+  <div class="grid cols-2">
+    <div class="panel">
+      <div class="panel-head">
+        <div><h2>▤ Pareto de modos de falla</h2><div class="desc">Top 15 Failure Desc · barras + % acumulado</div></div>
+        <div class="count-badge" id="pareto-badge"></div>
+      </div>
+      <div id="chart-pareto"></div>
+    </div>
+    <div class="panel">
+      <div class="panel-head">
+        <div><h2>▥ Defect Code</h2><div class="desc">Clasificación de causa raíz reportada</div></div>
+      </div>
+      <div id="chart-defect"></div>
+    </div>
+  </div>
+
+  <div class="grid cols-2">
+    <div class="panel">
+      <div class="panel-head">
+        <div><h2>⟲ Reincidencia por serial</h2><div class="desc">Unidades con múltiples fallas registradas (posibles crónicos / candidatos a MRB)</div></div>
+        <div class="count-badge" id="repeat-badge"></div>
+      </div>
+      <div class="scroll-box"><table class="data-table" id="table-repeat"><thead><tr>
+        <th data-k="serial">Serial</th><th data-k="n">Fallas</th><th data-k="po">PO</th><th data-k="rev">Rev</th><th data-k="last">Últ. modo</th>
+      </tr></thead><tbody></tbody></table></div>
+    </div>
+    <div class="panel">
+      <div class="panel-head">
+        <div><h2>▦ Perfil de falla por lote (PO)</h2><div class="desc">Top 10 lotes por volumen y su modo de falla dominante</div></div>
+      </div>
+      <div class="scroll-box"><table class="data-table" id="table-po"><thead><tr>
+        <th data-k="po">PO</th><th data-k="n">Fallas</th><th data-k="top">Modo dominante</th><th data-k="share">% del lote</th>
+      </tr></thead><tbody></tbody></table></div>
+    </div>
+  </div>
+
+  <div class="grid cols-3">
+    <div class="panel">
+      <div class="panel-head">
+        <div><h2>▧ Ubicación de falla (Location)</h2><div class="desc">Top puntos físicos reportados, excluyendo NDF</div></div>
+      </div>
+      <div id="chart-location"></div>
+    </div>
+    <div class="panel">
+      <div class="panel-head">
+        <div><h2>◆ Acción de retrabajo</h2><div class="desc">Resolución aplicada</div></div>
+      </div>
+      <div id="chart-rework"></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head">
+      <div><h2>◫ Generación de prueba vs. modo de falla</h2><div class="desc">Comparación de los 6 modos de falla más frecuentes según intento de prueba (First / Second / Third)</div></div>
+    </div>
+    <div id="chart-gen"></div>
+  </div>
+
+</main>
+
+<footer>
+  <div>GFC BOX IST Failure Dashboard · generado a partir de Info_Mau.xlsx</div>
+  <div id="footer-filtered">Cargando datos…</div>
+</footer>
+
+<div class="tooltip" id="tooltip"></div>
+
+<script src="script.js"></script>
+</body>
+</html>
